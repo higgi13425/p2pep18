@@ -50,9 +50,25 @@ df$first_name[df$attendee == 930620305] <- "Kim"
 df$last_name[df$attendee == 930620305] <- "Fitzpatrick 1"
 df$first_name[df$attendee == 930620306] <- "Kim"
 df$last_name[df$attendee == 930620306] <- "Fitzpatrick 2"
-
+df$last_name[df$attendee == 900923877] <- "Mandel 1"
+df$last_name[df$attendee == 903914703] <- "Mandel 2"
 
 # consider gather with one col for sessions
+
+df2<- gather(df, key="choice", value= "session", -(order_date:attendee)) %>% 
+  select(-choice) 
+df2$session <- str_trim(df2$session)
+df2 <- df2[df2$last_name!="Mandel 2",]
+
+df3 <- as.data.frame(table(df2$session))
+names(df3) <- c("session", "count")
+df3[rev(order(df3$count)),]
+df3$rank <- as.integer(21-rank(df3$count))
+
+df4 <- left_join(df2, df3, by = "session")  
+df4 <- df4[!is.na(df4$session),]
+df4 <- df4%>% arrange(attendee, rank)
+
 # can group, count in order by attendee
 # count occurrences, merge count table with attendee table
 # then give everyone their most and least popular 
