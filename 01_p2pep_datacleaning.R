@@ -253,6 +253,15 @@ vec9 <-((is.na(df5$topic)) & (df5$time_slot==5))
 df5$topic[which(vec9)[1:4]] <- "How to Grocery Shop with IBD"
 df5$topic[which(vec9)[5:27]] <- "Alternative Therapies in IBD"
 
+# note that filling in topics has left some NAs
+# fix by merging with join
+# have not figured this one out.
+
+# df25 <- df2 %>% select(attendee, order_date, first_name, last_name, email)
+# df5 <- semi_join(df5, df25, by="attendee")
+# 
+# df35 <- df3 %>% select(topic, count, rank, talknum, room, room_limit, time_slot)
+# df5 <- semi_join(df5, df35, by="topic")
 
 #check each session
 table(df5$topic[df5$time_slot==1])
@@ -261,51 +270,94 @@ table(df5$topic[df5$time_slot==2])
 table(df5$topic[df5$time_slot==4])
 table(df5$topic[df5$time_slot==5])
 
+#clean up attendee table
+attend <- df %>% select(1:5) 
+
+#clean up topics table
+topics <- df3 %>% rename(votes = count)
+
+#set up schedule table
+schedule <- df5 %>% select(attendee, time_slot, topic)
+
+#set up breakouts
+breakouts <- attend %>% select(attendee)
+breakouts$time_slot <- 3
+breakouts$topic <- "Lunch with Breakout Group"
+
+#set up rooms
+rooms <- df5 %>% select(topic) %>% distinct() %>% arrange(topic) %>% pull()
+rooms[22] <- "Diets and Dietary Research in IBD 2"
+rooms[23] <- "Lunch with Breakout Group"
+talknum <- c(51,55,45,21,42,53,13,14,52,23,44,46,41,25,54,22,11,43,24,26,15,12,30)
+roomsdf <- data.frame(rooms, talknum) %>% arrange(talknum)
+names(roomsdf) <- c("topic", "talknum")
+roomsdf<- roomsdf %>% mutate(room = 
+          case_when(roomsdf$talknum %% 10 == 1 ~ "Forum Hall",
+                    roomsdf$talknum %% 10==2 ~ "Great Lakes Central",
+                    roomsdf$talknum %% 10==3 ~ "Great Lakes North",
+                    roomsdf$talknum %% 10==4 ~ "Great Lakes South",
+                    roomsdf$talknum %% 10==5 ~ "Boardroom 1",
+                    roomsdf$talknum %% 10==6 ~ "Boardroom 2",
+                    roomsdf$talknum %% 10==0 ~ "Atrium and Breakout Rooms"))
+
+
+#bind_rows to get breakouts into schedule
+schedule <- bind_rows(schedule, breakouts)
+schedule <- schedule %>% group_by(attendee) %>% arrange(attendee, time_slot)
 ##--------------
-# set up breakouts
-df %>% select(attendee, breakout) -> df6
-
-#clean up names
-df6$breakout[df6$breakout=="Crohn's Disease group"]<-"Breakout for Crohn's Disease"
-df6$breakout[df6$breakout=="Ulcerative colitis group"]<-"Breakout for Ulcerative Colitis"
-df6$breakout[df6$breakout=="Family/Friend group"]<-"Breakout for Family and Friends"
-df6$breakout[df6$breakout=="Pediatric group"]<-"Breakout for Family and Friends"
-df6$breakout[df6$breakout=="Ostomy group" | df6$breakout=="J pouch group"]<-"Breakout for J pouch and Ostomy"
-
-#add rooms
-df6$room<- ""
-df6$room[df6$breakout=="Breakout for Crohn's Disease"]<-"Great Lakes North"
-df6$room[df6$breakout=="Breakout for Ulcerative Colitis"]<-"Great Lakes Central"
-df6$room[df6$breakout=="Breakout for Family and Friends"]<-"Great Lakes South"
-df6$room[df6$breakout=="Breakout for J pouch and Ostomy"]<-"Boardroom 1"
-df6$room[df6$breakout=="Other or prefer not to say"]<-"Atrium for Lunch"
-
-#add other fields
-df6$topic <- 4
-df6$time <- "11:40 - 1:00"
-
-#fix names
-names(df6)<-c("attendee", "topic", "room", "topic", "time")
-#reorder df6
-df6<- df6 %>% select(attendee, topic, topic, time, room)
 
 
-#remove choice and topicnum column from df5
-df5 %>% select(-choice, -topicnum) -> df5
+#add rooms - no data on what breakouts they want this year
+# df6$room<- ""
+# df6$room[df6$breakout=="Breakout for Crohn's Disease"]<-"Great Lakes North"
+# df6$room[df6$breakout=="Breakout for Ulcerative Colitis"]<-"Great Lakes Central"
+# df6$room[df6$breakout=="Breakout for Family and Friends"]<-"Great Lakes South"
+# df6$room[df6$breakout=="Breakout for J pouch and Ostomy"]<-"Boardroom 1"
+# df6$room[df6$breakout=="Other or prefer not to say"]<-"Atrium for Lunch"
 
-#combine df5 and df6
-df7 <- rbind(df5, df6)
+#add time to topics
+#create time intervals table
+time <- c("10:40-11:10", "11:20-11:50", "12:10-1:00", "1:10-1:40", 
+          "1:50-2:20")
+time_slot <- 1:5
+time_intervals <- data.frame(time, time_slot)
 
-df7 %>% arrange(attendee, topic) -> df7
-df7 %>% nest(-attendee) -> df7
+#merges to build up full table
+sched2 <- left_join(schedule, attend, by = "attendee")
+sched3 <- left_join(sched2, time_intervals)
+sched4 <- left_join(sched3, roomsdf, by= "topic") %>%  select(-talknum)
 
-df %>% select(attendee,`First Name`, `Last Name`) -> df8
+# now nest the schedule part, create
+# table df7 with attendee, session=time_slot, topic, time, room in that order
+# arrange by attendee, time_slot
+# then df7 %>% nest(-attendee) -> sched_nested
+df7 <- sched4 %>% select(attendee, Session = time_slot, Topic = topic, 
+                         Time = time, Room = room)
+df7 %>% nest(-attendee)  -> sched_nested
+
+#then form new df, df8
+attend %>% select(attendee,first_name, last_name) -> df8
 colnames(df8) <- c("attendee", "firstname", "lastname")
 
-# join with names
-left_join(df7, df8) %>% arrange(lastname) -> df9
+# join nested schedule with names
+left_join(sched_nested, df8) %>% arrange(lastname) -> df9
 
-
+#about 30 walkups each year - what to do with them?
+# add a schedule to give to late arrivals - put all in largest room
+# Forum Hall can handle the overflow
+# everyone gets same schedule - print 30
+df9[140,1] <-  930661199
+df9[140,2] <-  df9[139,2]
+df9[140,3] <-  "I-forgot-to-sign-up"
+df9[140,4] <-  "But-I-am-here!"
+walkups <- unnest(df9[140,2])
+walkups[c(1:2, 4:5), 4]<- "Forum Hall"
+walkups[c(1:5), 2]<- c("Research Update: What is the Future in IBD?",
+                       "Diets and Dietary Research in IBD 1",
+                       "Lunch with Breakout Group",
+                       "New IBD Research You Need To Know About",
+                       "Alternative Therapies in IBD")
+df9[140,2] <-  nest(walkups)
 #now make printable schedules
 # after Mine C-R at rmarkdown.rstudio.com/articles_mail_merge.html
 #using df9 as input data
@@ -319,12 +371,3 @@ for (i in 1:nrow(df9)) {
 }
 
 
-## -----------------
-
-# then give everyone their most and least popular 
-# assign to time_slot - make sure everyone has only one topic per time slot
-# first to sign up, then in order.
-
-# start filling least and most pop
-
-# add breakouts as time_slot 3, talks 32-35
