@@ -20,7 +20,7 @@ library(Hmisc) # for Lag
 #exported file from eventbrite,
 # custom question responses, as csv
 #Read in csv file
-df<- read_csv("p2pep_customreport_22mar18.csv")
+df<- read_csv("p2pep18_eventbrite_final.csv")
 # split choices column (24) into distinct columns, discard > 10 choices
 #separated by pipe, escape the pipe with 2 backslashes
 # name new columns a-j
@@ -346,18 +346,39 @@ left_join(sched_nested, df8) %>% arrange(lastname) -> df9
 # add a schedule to give to late arrivals - put all in largest room
 # Forum Hall can handle the overflow
 # everyone gets same schedule - print 30
-df9[140,1] <-  930661199
-df9[140,2] <-  df9[139,2]
-df9[140,3] <-  "I-forgot-to-sign-up"
-df9[140,4] <-  "But-I-am-here!"
-walkups <- unnest(df9[140,2])
+df9[139,1] <-  930661199
+df9[139,2] <-  df9[138,2]
+df9[139,3] <-  "TellMeAbout"
+df9[139,4] <-  "IBD"
+walkups <- unnest(df9[139,2])
 walkups[c(1:2, 4:5), 4]<- "Forum Hall"
 walkups[c(1:5), 2]<- c("Research Update: What is the Future in IBD?",
                        "Diets and Dietary Research in IBD 1",
                        "Lunch with Breakout Group",
                        "New IBD Research You Need To Know About",
                        "Alternative Therapies in IBD")
+df9[139,2] <-  nest(walkups)
+
+# bonus guests AGK and SGK
+df9[140,1] <-  930661200
+df9[140,3] <-  "Andrew"
+df9[140,4] <-  "Grogan-Kaylor"
+
+walkups[c(1:2, 4:5), 4]<- c("Great Lakes South", 
+                            "Great Lakes Central", 
+                            "Great Lakes South",
+                            "Great Lakes South")
+walkups[c(1:5), 2]<- c("Guided Meditation Exercise",
+                       "Diets and Dietary Research in IBD 1",
+                       "Lunch with Breakout Group",
+                       "IBD and Your Emotional Health",
+                       "Patient Medication Panel")
 df9[140,2] <-  nest(walkups)
+
+df9[141,1] <-  930661201
+df9[141,3] <-  "Shari"
+df9[141,4] <-  "Grogan-Kaylor"
+df9[141,2] <-  nest(walkups)
 #now make printable schedules
 # after Mine C-R at rmarkdown.rstudio.com/articles_mail_merge.html
 #using df9 as input data
